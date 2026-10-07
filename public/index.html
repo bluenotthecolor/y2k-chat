@@ -1,0 +1,1405 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Lobby - anonymous chat</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        font-family: Tahoma, Verdana, Geneva, sans-serif;
+        font-size: 14px;
+        color: #000;
+        background: #008080; /* classic desktop teal */
+        overflow: hidden;
+        user-select: none;
+      }
+      #log,
+      #log *,
+      input {
+        user-select: text;
+      }
+
+      /* ---------- desktop ---------- */
+      #desktop {
+        position: absolute;
+        inset: 0 0 30px 0;
+      }
+
+      #icons {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .icon {
+        width: 76px;
+        text-align: center;
+        color: #fff;
+        font-size: 12px;
+        padding: 3px;
+        cursor: default;
+      }
+      .icon .label {
+        display: inline-block;
+        padding: 1px 3px;
+        text-shadow: 1px 1px 0 #000;
+      }
+      .icon.sel .label {
+        background: #000080;
+        outline: 1px dotted #fff;
+        text-shadow: none;
+      }
+      .icon .img {
+        position: relative;
+        width: 34px;
+        height: 34px;
+        margin: 0 auto 4px;
+      }
+      .icon.sel .img {
+        opacity: 0.75;
+      }
+
+      /* my computer: a little monitor */
+      .pc .scr {
+        position: absolute;
+        left: 3px;
+        top: 2px;
+        width: 28px;
+        height: 20px;
+        background: #c0c0c0;
+        border: 2px solid;
+        border-color: #fff #404040 #404040 #fff;
+      }
+      .pc .scr::after {
+        content: "";
+        position: absolute;
+        inset: 2px;
+        background: #008080;
+        border: 1px solid #000;
+      }
+      .pc .base {
+        position: absolute;
+        left: 7px;
+        top: 25px;
+        width: 20px;
+        height: 6px;
+        background: #c0c0c0;
+        border: 2px solid;
+        border-color: #fff #404040 #404040 #fff;
+      }
+      /* recycle bin */
+      .bin .can {
+        position: absolute;
+        left: 7px;
+        top: 8px;
+        width: 20px;
+        height: 24px;
+        background: #c0c0c0;
+        border: 2px solid;
+        border-color: #fff #404040 #404040 #fff;
+        background-image: repeating-linear-gradient(
+          90deg,
+          transparent 0 3px,
+          #80808090 3px 4px
+        );
+      }
+      .bin .lid {
+        position: absolute;
+        left: 4px;
+        top: 4px;
+        width: 26px;
+        height: 5px;
+        background: #c0c0c0;
+        border: 2px solid;
+        border-color: #fff #404040 #404040 #fff;
+      }
+      /* notepad */
+      .note .pg {
+        position: absolute;
+        left: 6px;
+        top: 2px;
+        width: 22px;
+        height: 30px;
+        background: #fff;
+        border: 1px solid #000;
+        background-image: repeating-linear-gradient(
+          0deg,
+          transparent 0 4px,
+          #8080a0 4px 5px
+        );
+        background-position: 0 8px;
+      }
+      .note .pg::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: 6px;
+        background: #000080;
+      }
+
+      /* ---------- the chat window ---------- */
+      #win {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 820px;
+        height: 730px;
+        max-width: calc(100vw - 16px);
+        max-height: calc(100vh - 30px - 12px);
+        display: flex;
+        flex-direction: column;
+        background: #c0c0c0;
+        border: 2px solid;
+        border-color: #dfdfdf #000 #000 #dfdfdf;
+        box-shadow:
+          inset -1px -1px #808080,
+          inset 1px 1px #fff,
+          4px 4px 0 rgba(0, 0, 0, 0.35);
+        padding: 3px;
+      }
+      #win.hidden {
+        display: none;
+      }
+      #win.max {
+        left: 0 !important;
+        top: 0 !important;
+        transform: none !important;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: none;
+        max-height: none;
+      }
+
+      .titlebar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 4px 5px;
+        background: linear-gradient(90deg, #000080, #1084d0);
+        color: #fff;
+        font-weight: bold;
+        font-size: 14px;
+        cursor: default;
+        touch-action: none;
+      }
+      .titlebar .btns {
+        display: flex;
+        gap: 2px;
+      }
+      .titlebar .btns button {
+        width: 18px;
+        height: 16px;
+        padding: 0;
+        line-height: 12px;
+        text-align: center;
+        background: #c0c0c0;
+        color: #000;
+        font-size: 11px;
+        font-weight: bold;
+        font-family: inherit;
+        border: 1px solid;
+        border-color: #fff #000 #000 #fff;
+        box-shadow: inset -1px -1px #808080;
+        border-radius: 0;
+        cursor: pointer;
+      }
+      .titlebar .btns button:active {
+        border-color: #000 #fff #fff #000;
+        box-shadow: inset 1px 1px #808080;
+        padding: 1px 0 0 1px;
+      }
+
+      .menubar {
+        padding: 3px 5px;
+        font-size: 14px;
+        border-bottom: 1px solid #808080;
+      }
+      .menubar span {
+        margin-right: 14px;
+      }
+
+      .marquee {
+        overflow: hidden;
+        white-space: nowrap;
+        background: #000;
+        color: #c0c0c0;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 15px;
+        padding: 3px 0;
+        margin: 3px 0;
+        border: 1px solid;
+        border-color: #808080 #fff #fff #808080;
+      }
+      .marquee span {
+        display: inline-block;
+        padding-left: 100%;
+        animation: scroll 28s linear infinite;
+      }
+      @keyframes scroll {
+        to {
+          transform: translateX(-100%);
+        }
+      }
+
+      .statusbar {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 3px 5px;
+        font-size: 13px;
+      }
+      .dot {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        background: #008000;
+        margin-right: 6px;
+        border: 1px solid #000;
+      }
+      .dot.off {
+        background: #800000;
+      }
+
+      #log {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 8px 10px;
+        background: #fff;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 17px;
+        border: 2px solid;
+        border-color: #808080 #fff #fff #808080;
+        box-shadow: inset 1px 1px #000;
+      }
+      .msg {
+        margin: 0 0 5px;
+        padding: 1px 2px;
+        line-height: 1.3;
+        word-wrap: break-word;
+        overflow-wrap: anywhere;
+      }
+      .msg .who {
+        font-weight: bold;
+        margin-right: 6px;
+      }
+      .msg .time {
+        color: #808080;
+        margin-right: 6px;
+        font-size: 13px;
+      }
+      .msg.me .who::after {
+        content: " (you)";
+        font-weight: normal;
+      }
+      .msg .rbtn {
+        margin-left: 10px;
+        font-family: Tahoma, Verdana, sans-serif;
+        font-size: 12px;
+        color: #808080;
+        cursor: pointer;
+      }
+      .msg .rbtn:hover {
+        color: #000080;
+        text-decoration: underline;
+      }
+      .msg.flash {
+        background: #ffff99;
+      }
+      .quote {
+        margin: 0 0 2px 6px;
+        padding: 1px 6px;
+        font-size: 14px;
+        color: #606060;
+        cursor: pointer;
+        border-left: 3px solid #808080;
+        background: #f0f0f0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .quote:hover {
+        background: #e0e0f0;
+      }
+      .msg .dbtn {
+        display: none;
+        margin-left: 6px;
+        color: #800000;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .msg .dbtn:hover {
+        text-decoration: underline;
+      }
+      body.admin .msg .dbtn {
+        display: inline;
+      }
+      .msg .gif {
+        display: block;
+        height: 100px;
+        width: auto;
+        max-width: 100%;
+        object-fit: contain;
+        margin: 4px 0 3px 6px;
+        background: #c0c0c0;
+        border: 2px solid;
+        border-color: #808080 #fff #fff #808080;
+      }
+      .sys {
+        color: #808080;
+        margin: 4px 0;
+      }
+
+      #replybar {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 3px 6px;
+        margin-top: 4px;
+        font-size: 13px;
+        background: #ffffe1;
+        border: 1px solid #000;
+      }
+      #replybar.show {
+        display: flex;
+      }
+      #replytxt {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #replyx {
+        width: 18px;
+        height: 16px;
+        padding: 0;
+        line-height: 12px;
+        font-size: 11px;
+        font-weight: bold;
+        font-family: inherit;
+        background: #c0c0c0;
+        border: 1px solid;
+        border-color: #fff #000 #000 #fff;
+        box-shadow: inset -1px -1px #808080;
+        border-radius: 0;
+        cursor: pointer;
+      }
+
+      form {
+        display: flex;
+        gap: 5px;
+        padding: 5px 0 3px;
+      }
+      input[type="text"] {
+        flex: 1;
+        min-width: 0;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 17px;
+        padding: 6px 7px;
+        border: 2px solid;
+        border-color: #808080 #fff #fff #808080;
+        box-shadow: inset 1px 1px #000;
+        background: #fff;
+        color: #000;
+        outline: none;
+        border-radius: 0;
+      }
+      .btn {
+        font-family: Tahoma, Verdana, sans-serif;
+        font-size: 14px;
+        padding: 4px 20px;
+        background: #c0c0c0;
+        color: #000;
+        border: 2px solid;
+        border-color: #fff #000 #000 #fff;
+        box-shadow: inset -1px -1px #808080;
+        border-radius: 0;
+        cursor: pointer;
+      }
+      .btn:active,
+      .btn.on {
+        border-color: #000 #fff #fff #000;
+        box-shadow: inset 1px 1px #808080;
+      }
+      .btn:active {
+        padding: 5px 19px 3px 21px;
+      }
+      #gifbtn {
+        padding: 4px 12px;
+        font-weight: bold;
+        letter-spacing: 1px;
+      }
+
+      .footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 5px;
+        font-size: 13px;
+        border: 1px solid;
+        border-color: #808080 #fff #fff #808080;
+        margin-top: 3px;
+      }
+      .counter {
+        display: inline-block;
+        background: #000;
+        color: #00ff00;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 14px;
+        font-weight: bold;
+        padding: 0 5px;
+        letter-spacing: 2px;
+        border: 1px solid;
+        border-color: #808080 #fff #fff #808080;
+      }
+
+      /* ---------- gif picker (lives inside the chat window) ---------- */
+      #picker {
+        display: none;
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        bottom: 84px;
+        height: 340px;
+        z-index: 20;
+        flex-direction: column;
+        background: #c0c0c0;
+        padding: 3px;
+        border: 2px solid;
+        border-color: #dfdfdf #000 #000 #dfdfdf;
+        box-shadow:
+          inset -1px -1px #808080,
+          inset 1px 1px #fff,
+          4px 4px 0 rgba(0, 0, 0, 0.35);
+      }
+      #picker.show {
+        display: flex;
+      }
+      #pickertabs {
+        display: none;
+        gap: 4px;
+        padding: 5px 0 3px;
+      }
+      #pickertabs .btn {
+        padding: 3px 14px;
+      }
+      #searchrow {
+        display: none;
+        gap: 5px;
+        padding: 3px 0 5px;
+      }
+      #searchrow input {
+        font-size: 15px;
+        padding: 4px 6px;
+      }
+      #gifgrid {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 8px;
+        margin-top: 4px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-content: flex-start;
+        background: #fff;
+        border: 2px solid;
+        border-color: #808080 #fff #fff #808080;
+        box-shadow: inset 1px 1px #000;
+      }
+      #gifgrid .g {
+        padding: 0;
+        height: 80px;
+        background: #c0c0c0;
+        cursor: pointer;
+        border-radius: 0;
+        border: 2px solid;
+        border-color: #fff #808080 #808080 #fff;
+      }
+      #gifgrid .g img {
+        display: block;
+        height: 100%;
+        width: auto;
+      }
+      #gifgrid .g:hover {
+        outline: 2px solid #000080;
+      }
+      .gridmsg {
+        width: 100%;
+        padding: 6px;
+        color: #808080;
+        font-size: 14px;
+      }
+
+      /* ---------- little dialog boxes ---------- */
+      .dialog {
+        position: absolute;
+        left: 50%;
+        top: 40%;
+        transform: translate(-50%, -50%);
+        width: 340px;
+        max-width: calc(100vw - 20px);
+        z-index: 50;
+        background: #c0c0c0;
+        padding: 3px;
+        border: 2px solid;
+        border-color: #dfdfdf #000 #000 #dfdfdf;
+        box-shadow:
+          inset -1px -1px #808080,
+          inset 1px 1px #fff,
+          4px 4px 0 rgba(0, 0, 0, 0.35);
+      }
+      .dialog .body {
+        padding: 14px 12px 8px;
+        white-space: pre-line;
+        line-height: 1.35;
+      }
+      .dialog .ok {
+        text-align: center;
+        padding: 6px 0 8px;
+      }
+      .dialog .ok .btn {
+        min-width: 74px;
+      }
+
+      /* ---------- taskbar ---------- */
+      #taskbar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 30px;
+        z-index: 40;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 3px;
+        background: #c0c0c0;
+        border-top: 2px solid #fff;
+        box-shadow: 0 -1px #dfdfdf;
+      }
+      #taskbar .tbtn {
+        height: 24px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 8px;
+        font-family: inherit;
+        font-size: 13px;
+        color: #000;
+        background: #c0c0c0;
+        cursor: pointer;
+        border: 2px solid;
+        border-color: #fff #000 #000 #fff;
+        box-shadow: inset -1px -1px #808080;
+        border-radius: 0;
+      }
+      #startbtn {
+        font-weight: bold;
+      }
+      #startbtn .logo {
+        width: 14px;
+        height: 14px;
+        display: grid;
+        grid-template: 1fr 1fr / 1fr 1fr;
+        gap: 1px;
+      }
+      #startbtn .logo i {
+        background: #404040;
+      }
+      #startbtn.down,
+      #taskwin.down {
+        border-color: #000 #fff #fff #000;
+        box-shadow: inset 1px 1px #808080;
+      }
+      #taskwin {
+        width: 170px;
+        justify-content: flex-start;
+        font-weight: bold;
+        overflow: hidden;
+        white-space: nowrap;
+        background-image: repeating-conic-gradient(#c0c0c0 0 25%, #fff 0 50%);
+        background-size: 2px 2px;
+      }
+      #taskwin:not(.down) {
+        background: #c0c0c0;
+        font-weight: normal;
+      }
+      #taskwin.down {
+        background-color: #fff;
+      }
+      .sep {
+        width: 2px;
+        height: 22px;
+        border-left: 1px solid #808080;
+        border-right: 1px solid #fff;
+      }
+      #tray {
+        margin-left: auto;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        font-size: 12px;
+        border: 1px solid;
+        border-color: #808080 #fff #fff #808080;
+      }
+
+      #startmenu {
+        position: absolute;
+        left: 3px;
+        bottom: 30px;
+        z-index: 60;
+        width: 190px;
+        display: none;
+        background: #c0c0c0;
+        padding: 3px 3px 3px 26px;
+        border: 2px solid;
+        border-color: #dfdfdf #000 #000 #dfdfdf;
+        box-shadow:
+          inset -1px -1px #808080,
+          inset 1px 1px #fff,
+          3px 3px 0 rgba(0, 0, 0, 0.35);
+      }
+      #startmenu::before {
+        content: "The Lobby";
+        position: absolute;
+        left: 3px;
+        top: 3px;
+        bottom: 3px;
+        width: 20px;
+        background: linear-gradient(0deg, #000080, #1084d0);
+        color: #fff;
+        font-weight: bold;
+        font-size: 14px;
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        text-align: left;
+        padding: 6px 3px;
+      }
+      #startmenu.open {
+        display: block;
+      }
+      #startmenu .item {
+        padding: 7px 8px;
+        font-size: 13px;
+        cursor: default;
+      }
+      #startmenu .item:hover {
+        background: #000080;
+        color: #fff;
+      }
+      #startmenu hr {
+        margin: 2px 0;
+        border: 0;
+        border-top: 1px solid #808080;
+        border-bottom: 1px solid #fff;
+      }
+
+      /* ---------- phones: window fills the screen above the taskbar ---------- */
+      @media (max-width: 600px) {
+        #icons {
+          display: none;
+        }
+        #win {
+          left: 0 !important;
+          top: 0 !important;
+          transform: none !important;
+          width: 100% !important;
+          height: 100% !important;
+          max-width: none;
+          max-height: none;
+        }
+        .menubar {
+          display: none;
+        }
+        #taskwin {
+          width: 120px;
+        }
+        #log {
+          font-size: 16px;
+        }
+        #picker {
+          height: 300px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="desktop">
+      <div id="icons">
+        <div class="icon">
+          <div class="img pc">
+            <div class="scr"></div>
+            <div class="base"></div>
+          </div>
+          <span class="label">My Computer</span>
+        </div>
+        <div class="icon">
+          <div class="img bin">
+            <div class="lid"></div>
+            <div class="can"></div>
+          </div>
+          <span class="label">Recycle Bin</span>
+        </div>
+        <div class="icon">
+          <div class="img note"><div class="pg"></div></div>
+          <span class="label">Rules.txt</span>
+        </div>
+      </div>
+
+      <div id="win">
+        <div class="titlebar" id="titlebar">
+          <span>The Lobby - anonymous chat</span>
+          <div class="btns">
+            <button type="button" id="btnMin" title="Minimize">_</button>
+            <button type="button" id="btnMax" title="Maximize">&#9633;</button>
+            <button type="button" id="btnClose" title="Close">x</button>
+          </div>
+        </div>
+
+        <div class="menubar">
+          <span><u>F</u>ile</span><span><u>E</u>dit</span
+          ><span><u>V</u>iew</span><span><u>H</u>elp</span>
+        </div>
+
+        <div class="marquee">
+          <span
+            >*** welcome to the lobby *** no username, no signup *** be nice ***
+            everything you type is public and saved best viewed at 800x600
+            ***</span
+          >
+        </div>
+
+        <div class="statusbar">
+          <div>
+            <span class="dot" id="dot"></span
+            ><span id="status">connecting...</span>
+          </div>
+          <div>users online: <b id="online">?</b></div>
+        </div>
+
+        <div id="log"></div>
+
+        <div id="replybar">
+          <span id="replytxt"></span
+          ><button type="button" id="replyx" title="Cancel reply">x</button>
+        </div>
+
+        <form id="form" autocomplete="off">
+          <input
+            type="text"
+            id="input"
+            maxlength="280"
+            placeholder="type a message..."
+            enterkeyhint="send"
+            autofocus
+          />
+          <button type="submit" class="btn">Send</button>
+        </form>
+
+        <div class="footer">
+          <div>you are: <b id="you">...</b></div>
+          <div>
+            total visitors: <span class="counter" id="visits">000000</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="startmenu">
+      <div class="item" id="miAbout">About The Lobby...</div>
+      <div class="item" id="miRules">Rules...</div>
+      <hr />
+      <div class="item" id="miOff">Shut Down...</div>
+    </div>
+
+    <div id="taskbar">
+      <button type="button" class="tbtn" id="startbtn">
+        <span class="logo"><i></i><i></i><i></i><i></i></span>Start
+      </button>
+      <div class="sep"></div>
+      <button type="button" class="tbtn down" id="taskwin">The Lobby</button>
+      <div id="tray"><span id="clock">12:00 PM</span></div>
+    </div>
+
+    <script>
+      (function () {
+        const log = document.getElementById("log");
+        const form = document.getElementById("form");
+        const input = document.getElementById("input");
+        const statusEl = document.getElementById("status");
+        const dot = document.getElementById("dot");
+        const onlineEl = document.getElementById("online");
+        const visitsEl = document.getElementById("visits");
+        const youEl = document.getElementById("you");
+
+        let ws,
+          myId = null,
+          retry = 0;
+        let oldestId = null; // id of the oldest message currently shown
+        let hasMore = false; // does the server have older messages?
+        let loadingOlder = false;
+        let replyTo = null; // { id } of the message being replied to
+        let isAdmin = false; // owner mode (set by the server after /login)
+        const getAdminKey = () => {
+          try {
+            return localStorage.getItem("lobbyAdminKey");
+          } catch {
+            return null;
+          }
+        };
+        const setAdminKey = (k) => {
+          try {
+            if (k) localStorage.setItem("lobbyAdminKey", k);
+            else localStorage.removeItem("lobbyAdminKey");
+          } catch {}
+        };
+        let pendingKey = null; // key typed with /login, saved once the server accepts it
+
+        const topMarker = document.createElement("div");
+        topMarker.className = "sys";
+
+        // classic dark web-safe-ish colors, nothing bright
+        const COLORS = [
+          "#000080",
+          "#800000",
+          "#006400",
+          "#800080",
+          "#606000",
+          "#006666",
+          "#444444",
+        ];
+        const color = (id) => COLORS[id % COLORS.length];
+        const FACES = [
+          "(^_^)",
+          "(o_o)",
+          "(>_<)",
+          "(^o^)",
+          "(-_-)",
+          "(*_*)",
+          "(~_~)",
+          "(T_T)",
+          "(=^.^=)",
+          "(^3^)",
+        ];
+        const face = (id) => FACES[id % FACES.length];
+        const anonName = (id) => "anon-" + String(id).padStart(4, "0");
+
+        // secret token kept in this browser so you stay the same anon after a refresh
+        function getToken() {
+          try {
+            return localStorage.getItem("lobbyToken");
+          } catch {
+            return null;
+          }
+        }
+        function saveToken(t) {
+          try {
+            localStorage.setItem("lobbyToken", t);
+          } catch {}
+        }
+
+        function addSys(text) {
+          const d = document.createElement("div");
+          d.className = "sys";
+          d.textContent = "* " + text;
+          log.appendChild(d);
+          log.scrollTop = log.scrollHeight;
+        }
+
+        const MONTHS = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+        function formatTime(ts) {
+          const t = new Date(ts);
+          const hm =
+            t.getHours().toString().padStart(2, "0") +
+            ":" +
+            t.getMinutes().toString().padStart(2, "0");
+          const now = new Date();
+          const sameDay =
+            t.getFullYear() === now.getFullYear() &&
+            t.getMonth() === now.getMonth() &&
+            t.getDate() === now.getDate();
+          return (
+            "[" +
+            (sameDay ? "" : MONTHS[t.getMonth()] + " " + t.getDate() + " ") +
+            hm +
+            "]"
+          );
+        }
+
+        /* ---------- messages ---------- */
+        function buildMsg(m) {
+          const d = document.createElement("div");
+          d.className = "msg" + (m.anon === myId ? " me" : "");
+          d.dataset.id = m.id;
+
+          if (m.reply) {
+            const q = document.createElement("div");
+            q.className = "quote";
+            q.title = "jump to that message";
+            const qw = document.createElement("b");
+            qw.style.color = color(m.reply.anon);
+            qw.textContent = anonName(m.reply.anon);
+            q.append("↪ ", qw, ": " + m.reply.text);
+            q.addEventListener("click", () => jumpTo(m.reply.id));
+            d.appendChild(q);
+          }
+
+          const time = document.createElement("span");
+          time.className = "time";
+          time.textContent = formatTime(m.ts);
+
+          const who = document.createElement("span");
+          who.className = "who";
+          who.style.color = color(m.anon);
+          who.textContent = face(m.anon) + " " + anonName(m.anon) + ":";
+
+          d.append(time, who);
+
+          if (m.text) {
+            const text = document.createElement("span");
+            text.textContent = m.text; // textContent => no HTML injection
+            d.appendChild(text);
+          }
+
+          const rbtn = document.createElement("span");
+          rbtn.className = "rbtn";
+          rbtn.textContent = "[reply]";
+          rbtn.title = "reply to this message";
+          rbtn.addEventListener("click", () => setReply(m));
+          d.appendChild(rbtn);
+
+          const dbtn = document.createElement("span");
+          dbtn.className = "dbtn";
+          dbtn.textContent = "[del]";
+          dbtn.title = "delete this message (owner only)";
+          dbtn.addEventListener("click", () => {
+            if (ws && ws.readyState === 1)
+              ws.send(JSON.stringify({ type: "delete", id: m.id }));
+          });
+          d.appendChild(dbtn);
+
+          return d;
+        }
+
+        // new message at the bottom; only jump down if you're already near the bottom (or it's yours)
+        function addMsg(m) {
+          const nearBottom =
+            log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+          log.appendChild(buildMsg(m));
+          if (oldestId === null || m.id < oldestId) oldestId = m.id;
+          if (nearBottom || m.anon === myId) log.scrollTop = log.scrollHeight;
+        }
+
+        function updateTopMarker() {
+          topMarker.textContent = hasMore
+            ? "~ scroll up for older messages ~"
+            : "~ start of chat ~";
+          if (!topMarker.parentNode)
+            log.insertBefore(topMarker, log.firstChild);
+        }
+
+        // older messages go on top; keep the user's reading position steady
+        function prependMessages(list) {
+          const prevHeight = log.scrollHeight;
+          const prevTop = log.scrollTop;
+          const frag = document.createDocumentFragment();
+          list.forEach((m) => {
+            frag.appendChild(buildMsg(m));
+            if (oldestId === null || m.id < oldestId) oldestId = m.id;
+          });
+          topMarker.after(frag);
+          log.scrollTop = prevTop + (log.scrollHeight - prevHeight);
+        }
+
+        function loadOlder() {
+          if (
+            loadingOlder ||
+            !hasMore ||
+            oldestId === null ||
+            !ws ||
+            ws.readyState !== 1
+          )
+            return;
+          loadingOlder = true;
+          topMarker.textContent = "~ loading older messages... ~";
+          ws.send(JSON.stringify({ type: "history", before: oldestId }));
+        }
+
+        log.addEventListener("scroll", () => {
+          if (log.scrollTop < 40) loadOlder();
+        });
+
+        /* ---------- replies ---------- */
+        const replybar = document.getElementById("replybar");
+        const replytxt = document.getElementById("replytxt");
+
+        function setReply(m) {
+          replyTo = { id: m.id };
+          const snippet = m.text.slice(0, 60);
+          replytxt.textContent =
+            "replying to " + anonName(m.anon) + ": " + snippet;
+          replybar.classList.add("show");
+          input.focus();
+        }
+        function clearReply() {
+          replyTo = null;
+          replybar.classList.remove("show");
+        }
+        document.getElementById("replyx").addEventListener("click", () => {
+          clearReply();
+          input.focus();
+        });
+
+        function jumpTo(id) {
+          const el = log.querySelector('[data-id="' + id + '"]');
+          if (!el) {
+            addSys("that message is further up - scroll up to load older ones");
+            return;
+          }
+          el.scrollIntoView({ block: "center" });
+          el.classList.add("flash");
+          setTimeout(() => el.classList.remove("flash"), 1400);
+        }
+
+        /* ---------- connection ---------- */
+        function connect() {
+          const proto = location.protocol === "https:" ? "wss" : "ws";
+          const token = getToken();
+          ws = new WebSocket(
+            proto +
+              "://" +
+              location.host +
+              (token ? "/?t=" + encodeURIComponent(token) : ""),
+          );
+
+          ws.onopen = () => {
+            retry = 0;
+            const k = getAdminKey();
+            if (k) ws.send(JSON.stringify({ type: "login", key: k }));
+            statusEl.textContent = "connected";
+            dot.classList.remove("off");
+          };
+
+          ws.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type === "welcome") {
+              myId = data.you;
+              if (data.token) saveToken(data.token);
+              youEl.textContent = face(myId) + " " + anonName(myId);
+              youEl.style.color = color(myId);
+              visitsEl.textContent = String(data.visits).padStart(6, "0");
+              log.innerHTML = "";
+              oldestId = null;
+              loadingOlder = false;
+              hasMore = !!data.hasMore;
+              topMarker.parentNode && topMarker.remove();
+              updateTopMarker();
+              data.history.forEach(addMsg);
+              addSys("you are now known as " + anonName(myId));
+              log.scrollTop = log.scrollHeight;
+            } else if (data.type === "history") {
+              hasMore = !!data.hasMore;
+              prependMessages(data.messages);
+              loadingOlder = false;
+              updateTopMarker();
+              // if the first page didn't fill the box, keep loading until it scrolls
+              if (hasMore && log.scrollHeight <= log.clientHeight) loadOlder();
+            } else if (data.type === "msg") {
+              addMsg(data);
+            } else if (data.type === "online") {
+              onlineEl.textContent = data.count;
+              if (typeof data.visitors === "number")
+                visitsEl.textContent = String(data.visitors).padStart(6, "0");
+            } else if (data.type === "sys") {
+              addSys(data.text);
+            } else if (data.type === "cleared") {
+              log.querySelectorAll(".msg").forEach((el) => el.remove());
+              oldestId = null;
+              hasMore = false;
+              updateTopMarker();
+              addSys("the chat was cleared");
+            } else if (data.type === "deleted") {
+              const el = log.querySelector('[data-id="' + data.id + '"]');
+              if (el) el.remove();
+            } else if (data.type === "admin") {
+              isAdmin = !!data.on;
+              document.body.classList.toggle("admin", isAdmin);
+              if (data.on) {
+                if (pendingKey) setAdminKey(pendingKey);
+                if (pendingKey)
+                  addSys("owner mode on - type /help for commands");
+              } else {
+                if (pendingKey) addSys("wrong key");
+                setAdminKey(null);
+              }
+              pendingKey = null;
+            } else if (data.type === "slow") {
+              addSys("you are sending messages too fast");
+            }
+          };
+
+          ws.onclose = () => {
+            statusEl.textContent = "disconnected - retrying...";
+            dot.classList.add("off");
+            retry++;
+            setTimeout(connect, Math.min(1000 * retry, 5000));
+          };
+        }
+
+        function send() {
+          const text = input.value.trim();
+          if (!text) return;
+          if (!ws || ws.readyState !== 1) {
+            addSys(
+              "not connected yet - open the site through the server (localhost:3000), not as a file",
+            );
+            return;
+          }
+          // /login <key> goes to the server as a private login, never as a chat message
+          const lm = text.match(/^\/login\s+(\S+)$/i);
+          if (lm) {
+            pendingKey = lm[1];
+            ws.send(JSON.stringify({ type: "login", key: lm[1] }));
+            input.value = "";
+            return;
+          }
+          if (/^\/logout$/i.test(text)) {
+            setAdminKey(null);
+            input.value = "";
+            if (isAdmin) ws.send(JSON.stringify({ type: "logout" }));
+            else addSys("you are not in owner mode");
+            return;
+          }
+          const payload = { type: "msg", text };
+          if (replyTo) payload.replyTo = replyTo.id;
+          ws.send(JSON.stringify(payload));
+          input.value = "";
+          clearReply();
+          input.focus();
+        }
+
+        form.addEventListener("submit", (e) => {
+          e.preventDefault();
+          send();
+        });
+
+        // Enter always sends (also covers phone keyboards)
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+            e.preventDefault();
+            send();
+          }
+        });
+
+        connect();
+
+        /* ================= desktop stuff: window, taskbar, start menu ================= */
+        const desktop = document.getElementById("desktop");
+        const win = document.getElementById("win");
+        const bar = document.getElementById("titlebar");
+        const taskwin = document.getElementById("taskwin");
+        const startbtn = document.getElementById("startbtn");
+        const startmenu = document.getElementById("startmenu");
+        const phone = window.matchMedia("(max-width: 600px)");
+
+        // clock
+        const clock = document.getElementById("clock");
+        function tick() {
+          const d = new Date();
+          let h = d.getHours();
+          const m = String(d.getMinutes()).padStart(2, "0");
+          const ap = h >= 12 ? "PM" : "AM";
+          h = h % 12 || 12;
+          clock.textContent = h + ":" + m + " " + ap;
+        }
+        tick();
+        setInterval(tick, 15000);
+
+        // dialog boxes
+        function showDialog(title, text) {
+          const old = document.getElementById("dlg");
+          if (old) old.remove();
+          const d = document.createElement("div");
+          d.className = "dialog";
+          d.id = "dlg";
+          const t = document.createElement("div");
+          t.className = "titlebar";
+          const ts = document.createElement("span");
+          ts.textContent = title;
+          t.appendChild(ts);
+          const body = document.createElement("div");
+          body.className = "body";
+          body.textContent = text;
+          const ok = document.createElement("div");
+          ok.className = "ok";
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "btn";
+          b.textContent = "OK";
+          b.onclick = () => d.remove();
+          ok.appendChild(b);
+          d.append(t, body, ok);
+          desktop.appendChild(d);
+          b.focus();
+        }
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") {
+            const d = document.getElementById("dlg");
+            if (d) d.remove();
+            startmenu.classList.remove("open");
+            startbtn.classList.remove("down");
+            clearReply();
+          }
+        });
+
+        // minimize / maximize / close
+        function setHidden(h) {
+          win.classList.toggle("hidden", h);
+          taskwin.classList.toggle("down", !h);
+          if (!h) input.focus();
+        }
+        document.getElementById("btnMin").onclick = () => setHidden(true);
+        taskwin.onclick = () => setHidden(!win.classList.contains("hidden"));
+        document.getElementById("btnMax").onclick = toggleMax;
+        bar.addEventListener("dblclick", (e) => {
+          if (!e.target.closest(".btns")) toggleMax();
+        });
+        function toggleMax() {
+          if (!phone.matches) win.classList.toggle("max");
+        }
+        document.getElementById("btnClose").onclick = () =>
+          showDialog(
+            "The Lobby",
+            "This window can't be closed.\n\nTo leave, just close the browser tab.",
+          );
+
+        // drag the window by its title bar
+        let drag = null;
+        bar.addEventListener("pointerdown", (e) => {
+          if (
+            e.target.closest(".btns") ||
+            win.classList.contains("max") ||
+            phone.matches
+          )
+            return;
+          const r = win.getBoundingClientRect();
+          win.style.transform = "none";
+          win.style.left = r.left + "px";
+          win.style.top = r.top + "px";
+          drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+          bar.setPointerCapture(e.pointerId);
+        });
+        bar.addEventListener("pointermove", (e) => {
+          if (!drag) return;
+          const x = Math.min(
+            Math.max(e.clientX - drag.dx, 80 - win.offsetWidth),
+            window.innerWidth - 80,
+          );
+          const y = Math.min(
+            Math.max(e.clientY - drag.dy, 0),
+            window.innerHeight - 30 - 24,
+          );
+          win.style.left = x + "px";
+          win.style.top = y + "px";
+        });
+        const endDrag = () => {
+          drag = null;
+        };
+        bar.addEventListener("pointerup", endDrag);
+        bar.addEventListener("pointercancel", endDrag);
+
+        // desktop icons: click to select, double-click to open
+        const icons = Array.from(document.querySelectorAll(".icon"));
+        icons.forEach((ic) =>
+          ic.addEventListener("click", (e) => {
+            e.stopPropagation();
+            icons.forEach((o) => o.classList.remove("sel"));
+            ic.classList.add("sel");
+          }),
+        );
+        icons[2].addEventListener("dblclick", () => showRules());
+        icons[0].addEventListener("dblclick", () =>
+          showDialog(
+            "My Computer",
+            "Nothing to see here.\n\nEverything happens in the chat window.",
+          ),
+        );
+        icons[1].addEventListener("dblclick", () =>
+          showDialog(
+            "Recycle Bin",
+            "The bin is empty.\n\n(Chat messages can't be deleted.)",
+          ),
+        );
+
+        // start menu
+        function closeStart() {
+          startmenu.classList.remove("open");
+          startbtn.classList.remove("down");
+        }
+        startbtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const open = startmenu.classList.toggle("open");
+          startbtn.classList.toggle("down", open);
+        });
+        document.addEventListener("click", (e) => {
+          if (!startmenu.contains(e.target)) closeStart();
+          if (!e.target.closest(".icon"))
+            icons.forEach((o) => o.classList.remove("sel"));
+        });
+        function showRules() {
+          showDialog(
+            "Rules.txt",
+            "1. be nice, or whatever.\n2. don't share your real name, number or address.\n3. everything you write is public and gets saved.\n4. you stay anon-XXXX as long as you use this browser.",
+          );
+        }
+        document.getElementById("miAbout").onclick = () => {
+          closeStart();
+          showDialog(
+            "About The Lobby",
+            "The Lobby\nan anonymous chat room.\n\nno username. no signup. just type.",
+          );
+        };
+        document.getElementById("miRules").onclick = () => {
+          closeStart();
+          showRules();
+        };
+        document.getElementById("miOff").onclick = () => {
+          closeStart();
+          showDialog(
+            "Shut Down",
+            "It is now safe to turn off your computer.\n\n(just kidding, close the tab if you want to leave)",
+          );
+        };
+      })();
+    </script>
+  </body>
+</html>

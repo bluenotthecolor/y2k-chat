@@ -1,0 +1,12 @@
+{
+  "name": "y2k-chat",
+  "version": "1.0.0",
+  "description": "Anonymous Y2K-style chat room",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
+  }
+}

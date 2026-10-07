@@ -1,0 +1,8 @@
+node_modules/
+.env
+.env.*
+admin.key
+messages.jsonl
+users.json
+*.log
+.DS_Store

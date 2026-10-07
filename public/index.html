@@ -2,35 +2,78 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta name="theme-color" content="#008080" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="The Lobby" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
     <title>The Lobby - anonymous chat</title>
     <style>
       * {
         box-sizing: border-box;
       }
+      :root {
+        --tb: 30px; /* taskbar height */
+        --tbfull: calc(var(--tb) + env(safe-area-inset-bottom, 0px));
+        --app-h: 100%; /* JS keeps this equal to the visible viewport (keyboard-aware) */
+        --app-top: 0px;
+        background: #008080;
+      }
+      @supports (height: 100dvh) {
+        :root {
+          --app-h: 100dvh;
+        }
+      }
       html,
       body {
         height: 100%;
         margin: 0;
+        overscroll-behavior: none;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
       }
       body {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: var(--app-top);
+        height: var(--app-h);
         font-family: Tahoma, Verdana, Geneva, sans-serif;
         font-size: 14px;
         color: #000;
         background: #008080; /* classic desktop teal */
         overflow: hidden;
         user-select: none;
+        -webkit-user-select: none;
       }
       #log,
       #log *,
       input {
         user-select: text;
+        -webkit-user-select: text;
+      }
+      button,
+      .btn,
+      .icon,
+      #startmenu .item,
+      .rbtn,
+      .dbtn,
+      .quote {
+        touch-action: manipulation; /* no 300ms tap delay, no double-tap zoom */
+        -webkit-tap-highlight-color: transparent;
       }
 
       /* ---------- desktop ---------- */
       #desktop {
         position: absolute;
-        inset: 0 0 30px 0;
+        inset: 0 0 var(--tbfull) 0;
       }
 
       #icons {
@@ -157,8 +200,8 @@
         transform: translate(-50%, -50%);
         width: 820px;
         height: 730px;
-        max-width: calc(100vw - 16px);
-        max-height: calc(100vh - 30px - 12px);
+        max-width: calc(100% - 16px);
+        max-height: calc(100% - 12px);
         display: flex;
         flex-direction: column;
         background: #c0c0c0;
@@ -273,9 +316,31 @@
         background: #800000;
       }
 
-      #log {
+      #logwrap {
+        position: relative;
         flex: 1;
         min-height: 0;
+        display: flex;
+      }
+      #jump {
+        position: absolute;
+        right: 14px;
+        bottom: 10px;
+        z-index: 5;
+        display: none;
+        padding: 4px 12px;
+        font-size: 13px;
+        font-weight: bold;
+      }
+      #jump.show {
+        display: block;
+      }
+      #log {
+        flex: 1;
+        min-width: 0;
+        min-height: 0;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
         overflow-y: auto;
         padding: 8px 10px;
         background: #fff;
@@ -297,7 +362,7 @@
         margin-right: 6px;
       }
       .msg .time {
-        color: #808080;
+        color: #606060;
         margin-right: 6px;
         font-size: 13px;
       }
@@ -309,7 +374,7 @@
         margin-left: 10px;
         font-family: Tahoma, Verdana, sans-serif;
         font-size: 12px;
-        color: #808080;
+        color: #505050;
         cursor: pointer;
       }
       .msg .rbtn:hover {
@@ -359,7 +424,7 @@
         border-color: #808080 #fff #fff #808080;
       }
       .sys {
-        color: #808080;
+        color: #606060;
         margin: 4px 0;
       }
 
@@ -582,18 +647,20 @@
         left: 0;
         right: 0;
         bottom: 0;
-        height: 30px;
+        height: var(--tbfull);
         z-index: 40;
         display: flex;
         align-items: center;
         gap: 4px;
-        padding: 2px 3px;
+        padding: 2px max(3px, env(safe-area-inset-right, 0px))
+          calc(2px + env(safe-area-inset-bottom, 0px))
+          max(3px, env(safe-area-inset-left, 0px));
         background: #c0c0c0;
         border-top: 2px solid #fff;
         box-shadow: 0 -1px #dfdfdf;
       }
       #taskbar .tbtn {
-        height: 24px;
+        height: calc(var(--tb) - 6px);
         display: flex;
         align-items: center;
         gap: 6px;
@@ -644,13 +711,13 @@
       }
       .sep {
         width: 2px;
-        height: 22px;
+        height: calc(var(--tb) - 8px);
         border-left: 1px solid #808080;
         border-right: 1px solid #fff;
       }
       #tray {
         margin-left: auto;
-        height: 24px;
+        height: calc(var(--tb) - 6px);
         display: flex;
         align-items: center;
         padding: 0 10px;
@@ -662,7 +729,7 @@
       #startmenu {
         position: absolute;
         left: 3px;
-        bottom: 30px;
+        bottom: var(--tbfull);
         z-index: 60;
         width: 190px;
         display: none;
@@ -710,31 +777,212 @@
         border-bottom: 1px solid #fff;
       }
 
-      /* ---------- phones: window fills the screen above the taskbar ---------- */
-      @media (max-width: 600px) {
+      /* ---------- keyboard + accessibility basics (all devices) ---------- */
+      .btn:focus-visible,
+      #taskbar .tbtn:focus-visible,
+      .titlebar .btns button:focus-visible,
+      #replyx:focus-visible,
+      #startmenu .item:focus-visible {
+        outline: 1px dotted #000;
+        outline-offset: -5px;
+      }
+      input[type="text"]:focus-visible {
+        outline: 2px solid #000080;
+        outline-offset: 0;
+      }
+      #log:focus-visible {
+        outline: 1px dotted #000080;
+        outline-offset: -3px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .marquee span {
+          animation: none;
+          padding-left: 0;
+          display: block;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+      }
+
+      /* ---------- touch screens: bigger targets ---------- */
+      @media (pointer: coarse) {
+        :root {
+          --tb: 44px;
+        }
+        .titlebar {
+          padding: 5px 6px;
+        }
+        .titlebar .btns {
+          gap: 4px;
+        }
+        .titlebar .btns button {
+          width: 32px;
+          height: 26px;
+          font-size: 14px;
+          line-height: 20px;
+        }
+        .btn {
+          min-height: 44px;
+          font-size: 15px;
+        }
+        #jump {
+          min-height: 38px;
+          font-size: 14px;
+        }
+        #replybar {
+          padding: 4px 6px 4px 8px;
+          font-size: 14px;
+        }
+        #replyx {
+          width: 34px;
+          height: 30px;
+          font-size: 15px;
+          line-height: 22px;
+          flex: none;
+        }
+        .msg .rbtn {
+          display: inline-block;
+          padding: 12px 10px;
+          margin-top: -12px;
+          margin-bottom: -12px;
+          font-size: 13px;
+        }
+        .msg .dbtn {
+          padding: 9px 8px;
+          font-size: 13px;
+        }
+        .quote {
+          padding: 6px 8px;
+          margin-bottom: 4px;
+        }
+        #taskbar .tbtn {
+          font-size: 14px;
+        }
+        #startmenu {
+          width: 230px;
+        }
+        #startmenu .item {
+          padding: 13px 10px;
+          font-size: 15px;
+        }
+        .dialog .btn {
+          min-width: 100px;
+        }
+        .icon {
+          width: 88px;
+          font-size: 13px;
+        }
+        .icon .img {
+          width: 40px;
+          height: 40px;
+        }
+      }
+
+      /* ---------- short screens (phones in landscape): give the chat all the room ---------- */
+      @media (max-height: 500px) and (pointer: coarse) {
+        :root {
+          --tb: 34px;
+        }
+      }
+      @media (max-height: 500px) {
+        .marquee,
+        .footer,
+        .menubar {
+          display: none;
+        }
+      }
+
+      /* ---------- phones: the window IS the screen, above the taskbar ---------- */
+      @media (max-width: 600px), (max-height: 500px) and (pointer: coarse) {
         #icons {
           display: none;
         }
-        #win {
-          left: 0 !important;
-          top: 0 !important;
+        body.winhidden #icons {
+          display: flex;
+        }
+        #win,
+        #win.max {
+          inset: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0
+            env(safe-area-inset-left, 0px) !important;
           transform: none !important;
-          width: 100% !important;
-          height: 100% !important;
+          width: auto !important;
+          height: auto !important;
           max-width: none;
           max-height: none;
+          box-shadow:
+            inset -1px -1px #808080,
+            inset 1px 1px #fff;
         }
+        #btnMax,
         .menubar {
           display: none;
         }
         #taskwin {
-          width: 120px;
+          flex: 1;
+          width: auto;
+          min-width: 0;
+          max-width: 220px;
+        }
+        .marquee {
+          font-size: 13px;
+        }
+        .statusbar,
+        .footer {
+          font-size: 12px;
+        }
+        #tray {
+          padding: 0 8px;
         }
         #log {
           font-size: 16px;
+          padding: 6px 8px;
+        }
+        input[type="text"] {
+          font-size: 16px; /* 16px+ stops iOS zooming into the field */
+          min-height: 44px;
         }
         #picker {
           height: 300px;
+        }
+
+        /* two-line messages: name + reply on top, text underneath */
+        .msg {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: baseline;
+          padding: 4px 4px 5px;
+          margin: 0 0 3px;
+          line-height: 1.35;
+          border-bottom: 1px dotted #c8c8c8;
+        }
+        .msg .quote {
+          flex: 0 0 calc(100% - 6px);
+          min-width: 0;
+        }
+        .msg .time {
+          font-size: 12px;
+        }
+        .msg .rbtn {
+          order: 2;
+          margin-left: auto;
+        }
+        .msg .dbtn {
+          order: 3;
+        }
+        .msg .txt {
+          order: 4;
+          flex: 0 0 100%;
+          min-width: 0;
+        }
+
+        /* keyboard is up: hide the chrome so the conversation stays visible */
+        body.kb #taskbar,
+        body.kb .marquee,
+        body.kb .footer {
+          display: none;
+        }
+        body.kb #desktop {
+          bottom: 0;
         }
       }
     </style>
@@ -766,9 +1014,30 @@
         <div class="titlebar" id="titlebar">
           <span>The Lobby - anonymous chat</span>
           <div class="btns">
-            <button type="button" id="btnMin" title="Minimize">_</button>
-            <button type="button" id="btnMax" title="Maximize">&#9633;</button>
-            <button type="button" id="btnClose" title="Close">x</button>
+            <button
+              type="button"
+              id="btnMin"
+              title="Minimize"
+              aria-label="Minimize"
+            >
+              _
+            </button>
+            <button
+              type="button"
+              id="btnMax"
+              title="Maximize"
+              aria-label="Maximize"
+            >
+              &#9633;
+            </button>
+            <button
+              type="button"
+              id="btnClose"
+              title="Close"
+              aria-label="Close"
+            >
+              x
+            </button>
           </div>
         </div>
 
@@ -793,11 +1062,34 @@
           <div>users online: <b id="online">?</b></div>
         </div>
 
-        <div id="log"></div>
+        <div id="logwrap">
+          <div
+            id="log"
+            role="log"
+            aria-live="polite"
+            aria-label="chat messages"
+            tabindex="0"
+          ></div>
+          <button
+            type="button"
+            class="btn"
+            id="jump"
+            aria-label="Jump to the latest messages"
+          >
+            &#9660; latest
+          </button>
+        </div>
 
         <div id="replybar">
           <span id="replytxt"></span
-          ><button type="button" id="replyx" title="Cancel reply">x</button>
+          ><button
+            type="button"
+            id="replyx"
+            title="Cancel reply"
+            aria-label="Cancel reply"
+          >
+            x
+          </button>
         </div>
 
         <form id="form" autocomplete="off">
@@ -807,7 +1099,8 @@
             maxlength="280"
             placeholder="type a message..."
             enterkeyhint="send"
-            autofocus
+            autocapitalize="sentences"
+            aria-label="Message"
           />
           <button type="submit" class="btn">Send</button>
         </form>
@@ -847,6 +1140,38 @@
         const onlineEl = document.getElementById("online");
         const visitsEl = document.getElementById("visits");
         const youEl = document.getElementById("you");
+        const jump = document.getElementById("jump");
+
+        const coarse = window.matchMedia("(pointer: coarse)");
+        const phone = window.matchMedia(
+          "(max-width: 600px), (max-height: 500px) and (pointer: coarse)",
+        );
+        const reduceMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        );
+
+        // ---- scroll helpers: "stick to bottom" + a jump-to-latest button ----
+        let unseen = 0; // messages that arrived while you were reading older ones
+        let stick = true; // are we pinned to the newest message?
+        const distFromBottom = () =>
+          log.scrollHeight - log.scrollTop - log.clientHeight;
+        function updateJump() {
+          jump.classList.toggle("show", distFromBottom() > 150);
+          jump.textContent = unseen
+            ? "\u25BC " + unseen + " new"
+            : "\u25BC latest";
+        }
+        function scrollToBottom(smooth) {
+          log.scrollTo({
+            top: log.scrollHeight,
+            behavior: smooth && !reduceMotion.matches ? "smooth" : "auto",
+          });
+        }
+        jump.addEventListener("click", () => {
+          unseen = 0;
+          stick = true;
+          scrollToBottom(true);
+        });
 
         let ws,
           myId = null,
@@ -986,6 +1311,7 @@
 
           if (m.text) {
             const text = document.createElement("span");
+            text.className = "txt";
             text.textContent = m.text; // textContent => no HTML injection
             d.appendChild(text);
           }
@@ -1012,11 +1338,17 @@
 
         // new message at the bottom; only jump down if you're already near the bottom (or it's yours)
         function addMsg(m) {
-          const nearBottom =
-            log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+          const nearBottom = distFromBottom() < 80;
           log.appendChild(buildMsg(m));
           if (oldestId === null || m.id < oldestId) oldestId = m.id;
-          if (nearBottom || m.anon === myId) log.scrollTop = log.scrollHeight;
+          if (nearBottom || m.anon === myId) {
+            log.scrollTop = log.scrollHeight;
+            stick = true;
+            unseen = 0;
+          } else {
+            unseen++;
+          }
+          updateJump();
         }
 
         function updateTopMarker() {
@@ -1054,9 +1386,16 @@
           ws.send(JSON.stringify({ type: "history", before: oldestId }));
         }
 
-        log.addEventListener("scroll", () => {
-          if (log.scrollTop < 40) loadOlder();
-        });
+        log.addEventListener(
+          "scroll",
+          () => {
+            if (log.scrollTop < 40) loadOlder();
+            stick = distFromBottom() < 80;
+            if (stick) unseen = 0;
+            updateJump();
+          },
+          { passive: true },
+        );
 
         /* ---------- replies ---------- */
         const replybar = document.getElementById("replybar");
@@ -1091,7 +1430,11 @@
         }
 
         /* ---------- connection ---------- */
+        let reconnectTimer = null;
         function connect() {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+          if (ws && (ws.readyState === 0 || ws.readyState === 1)) return;
           const proto = location.protocol === "https:" ? "wss" : "ws";
           const token = getToken();
           ws = new WebSocket(
@@ -1126,6 +1469,9 @@
               data.history.forEach(addMsg);
               addSys("you are now known as " + anonName(myId));
               log.scrollTop = log.scrollHeight;
+              stick = true;
+              unseen = 0;
+              updateJump();
             } else if (data.type === "history") {
               hasMore = !!data.hasMore;
               prependMessages(data.messages);
@@ -1171,9 +1517,23 @@
             statusEl.textContent = "disconnected - retrying...";
             dot.classList.add("off");
             retry++;
-            setTimeout(connect, Math.min(1000 * retry, 5000));
+            reconnectTimer = setTimeout(connect, Math.min(1000 * retry, 5000));
           };
         }
+        // phones freeze background tabs; when you come back, reconnect immediately
+        function reconnectNow() {
+          if (!ws || ws.readyState === 3) {
+            retry = 0;
+            connect();
+          }
+        }
+        document.addEventListener("visibilitychange", () => {
+          if (!document.hidden) reconnectNow();
+        });
+        window.addEventListener("online", reconnectNow);
+        window.addEventListener("pageshow", (e) => {
+          if (e.persisted) reconnectNow();
+        });
 
         function send() {
           const text = input.value.trim();
@@ -1222,6 +1582,39 @@
 
         connect();
 
+        /* ---------- keep the app exactly as tall as what you can see ---------- */
+        const vv = window.visualViewport;
+        const rootStyle = document.documentElement.style;
+        let baseH = 0,
+          baseW = 0;
+        function fitViewport() {
+          if (vv && vv.scale > 1.05) return; // pinch-zoomed: leave the layout alone
+          const h = vv ? vv.height : window.innerHeight;
+          const w = vv ? vv.width : window.innerWidth;
+          rootStyle.setProperty("--app-h", h + "px");
+          rootStyle.setProperty("--app-top", (vv ? vv.offsetTop : 0) + "px");
+          if (Math.abs(w - baseW) > 60 || h > baseH) {
+            baseW = w;
+            baseH = h;
+          }
+          const kb = phone.matches && baseH - h > 150; // on-screen keyboard is open
+          document.body.classList.toggle("kb", kb);
+          if (stick) scrollToBottom(false);
+          if (window.scrollY) window.scrollTo(0, 0); // iOS nudges the page when a field gets focus
+        }
+        if (vv) {
+          vv.addEventListener("resize", fitViewport);
+          vv.addEventListener("scroll", fitViewport);
+        }
+        window.addEventListener("resize", fitViewport);
+        window.addEventListener("orientationchange", () =>
+          setTimeout(fitViewport, 250),
+        );
+        input.addEventListener("focus", () => setTimeout(fitViewport, 300));
+        fitViewport();
+        // don't pop the keyboard open on phones as soon as the page loads
+        if (!coarse.matches) input.focus();
+
         /* ================= desktop stuff: window, taskbar, start menu ================= */
         const desktop = document.getElementById("desktop");
         const win = document.getElementById("win");
@@ -1229,7 +1622,6 @@
         const taskwin = document.getElementById("taskwin");
         const startbtn = document.getElementById("startbtn");
         const startmenu = document.getElementById("startmenu");
-        const phone = window.matchMedia("(max-width: 600px)");
 
         // clock
         const clock = document.getElementById("clock");
@@ -1282,10 +1674,18 @@
         });
 
         // minimize / maximize / close
+        let savedScroll = 0;
         function setHidden(h) {
+          if (h) savedScroll = log.scrollTop;
           win.classList.toggle("hidden", h);
+          document.body.classList.toggle("winhidden", h);
           taskwin.classList.toggle("down", !h);
-          if (!h) input.focus();
+          if (!h) {
+            // a hidden element forgets its scroll position
+            log.scrollTop = stick ? log.scrollHeight : savedScroll;
+            updateJump();
+            if (!coarse.matches) input.focus();
+          }
         }
         document.getElementById("btnMin").onclick = () => setHidden(true);
         taskwin.onclick = () => setHidden(!win.classList.contains("hidden"));
@@ -1326,7 +1726,7 @@
           );
           const y = Math.min(
             Math.max(e.clientY - drag.dy, 0),
-            window.innerHeight - 30 - 24,
+            desktop.clientHeight - 24,
           );
           win.style.left = x + "px";
           win.style.top = y + "px";
@@ -1339,26 +1739,31 @@
 
         // desktop icons: click to select, double-click to open
         const icons = Array.from(document.querySelectorAll(".icon"));
-        icons.forEach((ic) =>
+        const iconActions = [
+          () =>
+            showDialog(
+              "My Computer",
+              "Nothing to see here.\n\nEverything happens in the chat window.",
+            ),
+          () =>
+            showDialog(
+              "Recycle Bin",
+              "The bin is empty.\n\n(Chat messages can't be deleted.)",
+            ),
+          () => showRules(),
+        ];
+        icons.forEach((ic, i) => {
           ic.addEventListener("click", (e) => {
             e.stopPropagation();
+            closeStart();
             icons.forEach((o) => o.classList.remove("sel"));
             ic.classList.add("sel");
-          }),
-        );
-        icons[2].addEventListener("dblclick", () => showRules());
-        icons[0].addEventListener("dblclick", () =>
-          showDialog(
-            "My Computer",
-            "Nothing to see here.\n\nEverything happens in the chat window.",
-          ),
-        );
-        icons[1].addEventListener("dblclick", () =>
-          showDialog(
-            "Recycle Bin",
-            "The bin is empty.\n\n(Chat messages can't be deleted.)",
-          ),
-        );
+            if (coarse.matches) iconActions[i](); // one tap opens on touch screens
+          });
+          ic.addEventListener("dblclick", () => {
+            if (!coarse.matches) iconActions[i]();
+          });
+        });
 
         // start menu
         function closeStart() {

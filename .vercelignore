@@ -1,0 +1,8 @@
+# local-only: the WebSocket server and its data files are not used on Vercel
+server.js
+messages.jsonl
+users.jsonl
+bans.jsonl
+admin.key
+.env
+.env.*

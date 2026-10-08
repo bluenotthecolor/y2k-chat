@@ -3,6 +3,9 @@ node_modules/
 .env.*
 admin.key
 messages.jsonl
+users.jsonl
 users.json
+bans.jsonl
 *.log
 .DS_Store
+.vercel
